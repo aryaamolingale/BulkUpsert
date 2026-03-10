@@ -26,8 +26,8 @@ DynamoDB Table
 
 | File | Description |
 |------|-------------|
-| `handler.mjs` | Main Lambda function — scans DynamoDB, upserts to Salesforce, handles failures |
-| `seed.mjs` | Utility script to insert dummy data into DynamoDB for testing |
+| `lambda.js` | Main Lambda function — scans DynamoDB, upserts to Salesforce, handles failures |
+| `index.mjs` | Utility script to insert dummy data into DynamoDB for testing |
 
 ---
 
@@ -40,7 +40,7 @@ DynamoDB Table
   - AWS Secrets Manager secret (see below)
   - Lambda execution role with permissions for DynamoDB, SQS, and Secrets Manager
 - Salesforce org with:
-  - A Connected App (OAuth2 `client_credentials` flow enabled)
+  - A External Client App (OAuth2 `client_credentials` flow enabled)
   - A custom field `Platform_Shooper_Id__c` on the `Contact` object
 
 ---
@@ -54,13 +54,12 @@ Create a secret named `bulkTransferSecredt` in AWS Secrets Manager with the foll
   "SF_CLIENT_ID": "your_salesforce_connected_app_client_id",
   "SF_CLIENT_SECRET": "your_salesforce_connected_app_client_secret",
   "SF_TOKEN_URL": "https://login.salesforce.com/services/oauth2/token",
-  "SF_API_VERSION": "v59.0",
+  "SF_API_VERSION": "v60.0",
   "DYNAMO_TABLE_NAME": "CustomerInteractions",
   "DLQ_URL": "https://sqs.<region>.amazonaws.com/<account-id>/<queue-name>"
 }
 ```
 
-> **Note:** The secret name `bulkTransferSecredt` contains a typo — keep it as-is to match the Lambda code, or update both together.
 
 ---
 
@@ -130,7 +129,6 @@ node seed.mjs
 }
 ```
 
-> **Note:** The seed script uses field `Number` but the Lambda reads `Mobile`. Make sure your real data uses `Mobile` for phone numbers to be synced to Salesforce.
 
 ---
 
@@ -150,18 +148,6 @@ The Lambda execution role needs the following permissions:
   "Resource": "*"
 }
 ```
-
----
-
-## Known Issues & Notes
-
-| Issue | Detail |
-|-------|--------|
-| Typo in secret name | `bulkTransferSecredt` — update consistently if renaming |
-| Typo in field name | `Platform_Shooper_Id__c` (double-o) — must match Salesforce field exactly |
-| `DLQ_URL` scope | Defined inside `handler` but referenced in `sendToDLQ` which is outside — ensure `DLQ_URL` is passed or moved to module scope |
-| Seed vs Lambda field mismatch | Seed uses `Number`; Lambda maps `Mobile` → `MobilePhone` |
-| No job timeout | Job polling stops after 10 attempts (~30s); long-running jobs may appear incomplete |
 
 ---
 
