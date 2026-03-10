@@ -129,6 +129,93 @@ node index.js
 }
 ```
 
+---
+
+## Testing
+
+### 1. Seed the DynamoDB Table
+
+Run the seed script to populate the table with 201 dummy records (see [Seed Script](#seed-script--adding-test-data) above).
+
+Confirm records were inserted by scanning the table:
+
+```bash
+aws dynamodb scan \
+  --table-name CustomerInteractions \
+  --select COUNT \
+  --region us-east-1
+```
+
+You should see `"Count": 201` in the response.
+
+---
+
+### 2. Invoke the Lambda
+
+Trigger the Lambda manually via the AWS Console:
+
+1. Open the [AWS Lambda Console](https://console.aws.amazon.com/lambda) and select the **BulkUpsert** function
+2. Click the **Test** tab
+3. Create a new test event — the function doesn't require any specific input, so the default empty event `{}` is fine. Give it a name (e.g., `TestRun`) and click **Save**
+4. Click **Test** to invoke the function
+
+Once it finishes, expand the **Execution result** panel. You should see a successful response and log output similar to:
+
+```
+Job status: InProgress
+Job status: JobComplete
+Deleted 201 records from DynamoDB.
+```
+
+---
+
+### 3. Verify Results in Salesforce
+
+After the Lambda completes, confirm that the contacts were upserted in Salesforce:
+
+1. Log in to your Salesforce org
+2. Navigate to **Contacts** and search for one of the seeded records (e.g., `user2001@dummy.com`)
+3. Confirm the contact exists and that the `Platform_Shooper_Id__c` field is populated with the correct `externalId` value (e.g., `ext2001`)
+
+Alternatively, run a SOQL query via the **Developer Console** or **Salesforce CLI**:
+
+```bash
+sf data query \
+  --query "SELECT Id, FirstName, LastName, Email, Platform_Shooper_Id__c FROM Contact WHERE Email LIKE 'user20%' LIMIT 5" \
+  --target-org your-org-alias
+```
+
+---
+
+### 4. Verify DynamoDB Cleanup
+
+On a successful job, all processed records are deleted from DynamoDB. Confirm the table is empty:
+
+```bash
+aws dynamodb scan \
+  --table-name CustomerInteractions \
+  --select COUNT \
+  --region us-east-1
+```
+
+Expected response: `"Count": 0`
+
+---
+
+### 5. Check the Dead Letter Queue (DLQ)
+
+If any records failed to upsert in Salesforce, they will be routed to the SQS DLQ. Check for failed messages:
+
+```bash
+aws sqs receive-message \
+  --queue-url https://sqs.<region>.amazonaws.com/<account-id>/<queue-name> \
+  --max-number-of-messages 10 \
+  --region us-east-1
+```
+
+Each failed message will contain the Salesforce error detail and the original record data, which can be used to diagnose the issue (e.g., missing required fields, duplicate email conflicts, or field validation errors).
+
+If no messages are returned, all records were processed successfully.
 
 ---
 
