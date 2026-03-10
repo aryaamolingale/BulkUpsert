@@ -27,7 +27,7 @@ DynamoDB Table
 | File | Description |
 |------|-------------|
 | `lambda.js` | Main Lambda function — scans DynamoDB, upserts to Salesforce, handles failures |
-| `index.mjs` | Utility script to insert dummy data into DynamoDB for testing |
+| `index.js` | Utility script to insert dummy data into DynamoDB for testing |
 
 ---
 
@@ -99,7 +99,7 @@ All HTTP requests use exponential backoff with up to **3 retries** on statuses `
 
 ## Seed Script — Adding Test Data
 
-The `seed.mjs` script inserts 201 dummy records (`ext2000` – `ext2200`) into the DynamoDB table.
+The `index.js` script inserts 201 dummy records into the DynamoDB table.
 
 ### Usage
 
@@ -113,7 +113,7 @@ export AWS_ACCESS_KEY_ID=your_key
 export AWS_SECRET_ACCESS_KEY=your_secret
 
 # Run the seed script
-node seed.mjs
+node index.js
 ```
 
 **Sample record inserted:**
