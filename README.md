@@ -177,14 +177,6 @@ After the Lambda completes, confirm that the contacts were upserted in Salesforc
 2. Navigate to **Contacts** and search for one of the seeded records (e.g., `user2001@dummy.com`)
 3. Confirm the contact exists and that the `Platform_Shooper_Id__c` field is populated with the correct `externalId` value (e.g., `ext2001`)
 
-Alternatively, run a SOQL query via the **Developer Console** or **Salesforce CLI**:
-
-```bash
-sf data query \
-  --query "SELECT Id, FirstName, LastName, Email, Platform_Shooper_Id__c FROM Contact WHERE Email LIKE 'user20%' LIMIT 5" \
-  --target-org your-org-alias
-```
-
 ---
 
 ### 4. Verify DynamoDB Cleanup
