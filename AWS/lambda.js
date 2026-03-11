@@ -15,6 +15,7 @@ const sqsClient = new SQSClient({});
 const secretsClient = new SecretsManagerClient({});
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+//Get secrets from Secrets Manager
 async function getSecrets() {
   const command = new GetSecretValueCommand({
     SecretId: "bulkTransferSecredt",
@@ -29,6 +30,7 @@ async function getSecrets() {
 
 const MAX_RETRIES = 3;
 
+//Retry Logic for transient fails
 const retryFetch = async (url, options, attempt = 1) => {
   try {
     const response = await fetch(url, options);
@@ -64,6 +66,7 @@ const retryFetch = async (url, options, attempt = 1) => {
   }
 };
 
+//Send failed records to sqs
 const sendToDLQ = async (record, errorMessage) => {
   try {
     const messageBody = {
@@ -98,12 +101,12 @@ export const handler = async () => {
 
   let allItems = [];
   let lastEvaluatedKey = undefined;
-
+  //Get all records
   do {
     const scanResult = await dynamoClient.send(
       new ScanCommand({
         TableName: DYNAMO_TABLE_NAME,
-        ExclusiveStartKey: lastEvaluatedKey,
+        ExclusiveStartKey: lastEvaluatedKey, //Pagination for large data
       }),
     );
 
@@ -127,6 +130,7 @@ export const handler = async () => {
     "MobilePhone",
   ];
 
+  // Convert data to csv format
   const recordsToUpsert = allItems.map((item) => ({
     Platform_Shooper_Id__c: item.externalId,
     FirstName: item.FirstName,
@@ -143,6 +147,7 @@ export const handler = async () => {
   console.log("CSV generated.");
 
   try {
+    //Salesforce connection using OAuth
     const authResponse = await retryFetch(SF_TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -160,6 +165,7 @@ export const handler = async () => {
       await authResponse.json();
     console.log("Salesforce authentication successful.");
 
+    // Creating Job
     const jobResponse = await retryFetch(
       `${instanceUrl}/services/data/${SF_API_VERSION}/jobs/ingest`,
       {
@@ -183,6 +189,7 @@ export const handler = async () => {
     const { id: jobId } = await jobResponse.json();
     console.log("Bulk Job Created. Job ID:", jobId);
 
+    //Upload csv data
     const uploadResponse = await retryFetch(
       `${instanceUrl}/services/data/${SF_API_VERSION}/jobs/ingest/${jobId}/batches`,
       {
@@ -199,6 +206,7 @@ export const handler = async () => {
       throw new Error(`CSV Upload Failed: ${await uploadResponse.text()}`);
     console.log("CSV uploaded successfully.");
 
+    // closing the job
     await retryFetch(
       `${instanceUrl}/services/data/${SF_API_VERSION}/jobs/ingest/${jobId}`,
       {
@@ -212,6 +220,7 @@ export const handler = async () => {
     );
     console.log("Job marked as UploadComplete.");
 
+    //check job status
     let jobStatus;
     for (let attempt = 1; attempt <= 10; attempt++) {
       console.log(`Checking job status... Attempt ${attempt}`);
@@ -261,6 +270,7 @@ export const handler = async () => {
       }
     }
 
+    //Deleting records
     if (jobStatus.state === "JobComplete") {
       console.log("Deleting all records from DynamoDB...");
 
